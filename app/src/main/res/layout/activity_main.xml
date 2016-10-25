@@ -11,9 +11,23 @@
     tools:context="com.sauyee333.visatest1.MainActivity">
 
     <Button
-        android:id="@+id/hello"
-        android:textAllCaps="false"
+        android:id="@+id/helloToken"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Test!" />
+        android:text="Test token!"
+        android:textAllCaps="false" />
+
+    <Button
+        android:id="@+id/helloTwoWalSsl"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_toRightOf="@+id/helloToken"
+        android:text="Test two-way SSL!"
+        android:textAllCaps="false" />
+
+    <TextView
+        android:id="@+id/results"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/helloToken" />
 </RelativeLayout>

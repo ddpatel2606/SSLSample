@@ -3,4 +3,8 @@
 
     <string name="apiKey">YOUR_KEY</string>
     <string name="sharedSecret">YOUR_SHARED_SECRET</string>
+    <string name="certPassword">YOUR_CERT_PASSWORD</string>
+
+    <string name="userid">YOUR_USERID</string>
+    <string name="password">YOUR_PASSWORD</string>
 </resources>

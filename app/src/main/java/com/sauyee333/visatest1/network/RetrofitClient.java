@@ -12,10 +12,11 @@ import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.cert.Certificate;
+import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 
+import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 
@@ -33,11 +34,20 @@ public class RetrofitClient {
     private Retrofit retrofit;
     private RetrofitInterface retrofitInterface;
 
-    public RetrofitClient() {
+    public RetrofitClient(Context context, boolean twoWaySsl) {
         HttpLoggingInterceptor interceptor = new HttpLoggingInterceptor();
         interceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
-        OkHttpClient client = new OkHttpClient.Builder().addInterceptor(interceptor)
-                .addNetworkInterceptor(new StethoInterceptor()).build();
+
+        OkHttpClient.Builder builder = new OkHttpClient().newBuilder();
+        builder.addInterceptor(interceptor);
+        builder.addNetworkInterceptor(new StethoInterceptor());
+        if (twoWaySsl) {
+            SSLContext sslContext = getSSLConfig(context);
+            if (sslContext != null) {
+                builder.sslSocketFactory(sslContext.getSocketFactory());
+            }
+        }
+        OkHttpClient client = builder.build();
 
         retrofit = new Retrofit.Builder().baseUrl(BASE_URL)
                 .client(client)
@@ -47,15 +57,63 @@ public class RetrofitClient {
     }
 
     private static class SingletonHolder {
-        private static final RetrofitClient INSTANCE = new RetrofitClient();
+        private static RetrofitClient INSTANCE = null;
+
+        private static RetrofitClient getINSTANCE(Context context, boolean twoWaySsl) {
+            INSTANCE = new RetrofitClient(context, twoWaySsl);
+            return INSTANCE;
+        }
     }
 
-    public static RetrofitClient getInstance() {
-        return SingletonHolder.INSTANCE;
+    private SSLContext getSSLConfig(Context context) {
+        SSLContext sslContext = null;
+        CertificateFactory cf = null;
+        try {
+            KeyStore keyStore = KeyStore.getInstance("PKCS12");
+//            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("X509");
+            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            InputStream keyStoreStream = context.getResources().openRawResource(R.raw.sample_cert);
+            String pfxPassword = context.getResources().getString(R.string.certPassword);
+            keyStore.load(keyStoreStream, pfxPassword.toCharArray());
+            keyManagerFactory.init(keyStore, pfxPassword.toCharArray());
+
+            String tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm();
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(tmfAlgorithm);
+
+            if (trustManagerFactory != null) {
+                trustManagerFactory.init(keyStore);
+            }
+            sslContext = SSLContext.getInstance("TLS");
+            if (sslContext != null && trustManagerFactory != null && trustManagerFactory.getTrustManagers() != null) {
+                sslContext.init(null, trustManagerFactory.getTrustManagers(), null);
+            }
+        } catch (CertificateException ce) {
+            ce.printStackTrace();
+        } catch (KeyStoreException ke) {
+            ke.printStackTrace();
+        } catch (NoSuchAlgorithmException ne) {
+            ne.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (KeyManagementException me) {
+            me.printStackTrace();
+        } catch (UnrecoverableKeyException ue) {
+            ue.printStackTrace();
+        }
+        return sslContext;
+    }
+
+    public static RetrofitClient getInstance(Context context, boolean twoWaySsl) {
+        return SingletonHolder.getINSTANCE(context, twoWaySsl);
     }
 
     public void getHelloWorldApi(final NetworkCallback<HelloResponse> networkCallback, String token, String accept, String apikey) {
         retrofit2.Call<HelloResponse> call = retrofitInterface.getHelloWorld(token, accept, apikey);
+        call.enqueue(networkCallback);
+    }
+
+    public void getHelloWorldTwoWaySsl(final NetworkCallback<HelloResponse> networkCallback, String accept, String token) {
+        retrofit2.Call<HelloResponse> call = retrofitInterface.getHelloWorldTwoWaySsl(accept, token);
         call.enqueue(networkCallback);
     }
 }
